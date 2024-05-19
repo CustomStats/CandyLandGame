@@ -1,16 +1,21 @@
 /**
- * GameScreen.java
+ * java
  * This class represents a visual screen displaying the main game board.
  * Displayed after choosing a game piece or loading an existing save.
  */
 
 package com.candyland.game;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.Preferences;
-import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
@@ -23,7 +28,7 @@ import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.Timer;
 
-public class GameScreen implements Screen
+public class GameScreen extends ScreenAdapter
 {
 	// buttons and images
 	private Texture pausedLogo;
@@ -46,69 +51,113 @@ public class GameScreen implements Screen
 	private Texture pauseTexture;
 	private Rectangle pauseButton;
 
-	private static CandyLandMain game;
+	private CandyLandMain game;
 	private TiledMap gameSpaces;
 	private OrthographicCamera camera = new OrthographicCamera();
 	private OrthogonalTiledMapRenderer renderer;
 
 	// variables used to store game board information
-	private static Sprite[] playerSprites = new Sprite[CandyLandGame.GAME_PIECES];
-	private static Sprite[] playerSpritesDisplayed = new Sprite[CandyLandGame.GAME_PIECES];
-	private static Texture[] playerTextures = new Texture[CandyLandGame.GAME_PIECES];
-	public static CandyLandSpaces[] gamePositions = new CandyLandSpaces[137];
-	public static boolean pausedState = false;
-	public static int[] playerTokens = new int[CandyLandGame.GAME_PIECES];
-	public static float positions[][] = new float[CandyLandGame.GAME_PIECES][2];
-	private static boolean userSaved = false;
+	private Sprite[] playerSprites = new Sprite[GAME_PIECES];
+	private Sprite[] playerSpritesDisplayed = new Sprite[GAME_PIECES];
+	private Texture[] playerTextures = new Texture[GAME_PIECES];
+	public CandyLandSpaces[] gamePositions = new CandyLandSpaces[137];
+	public boolean pausedState = false;
+
+	public int[] playerTokens = new int[GAME_PIECES];
+	public float positions[][] = new float[GAME_PIECES][2];
+	private boolean userSaved = false;
 	
 	// final variables that do not change
-	public final static float RENDER_SCALE = 1/1.2f;
-	private final static int SQUARE_SIZE = 32;
-	public final static int MAX_POSITIONS = GameScreen.gamePositions.length - 1;
+	public final float RENDER_SCALE = 1/1.2f;
+	private final int SQUARE_SIZE = 32;
+	public final int MAX_POSITIONS = gamePositions.length - 1;
+	
+	private final String[] COLORS = {"Purple", "Yellow", "Blue", "Green", "Orange", "Red"};
+	private final int SINGLE_CARDS = 8;
+	private final int DOUBLE_CARDS = 2;
+
+	// Local Variables
+	private int playerIndex;
+	public boolean drawCardPressed = false;
+
+	// Public Variables
+	public final static int GAME_PIECES = 4;
+	public boolean loadedGame = false;
+	public boolean[] skipNextTurn = new boolean[GAME_PIECES];
+	public int[] playerPositions = new int[GAME_PIECES];
+	public boolean[] skipCurrentTurn = new boolean[GAME_PIECES];
+	public boolean validPress = false;
+	public boolean activeGame = false;
+	public boolean firstPress = true;
+	public boolean[] shortcutTaken = new boolean[GAME_PIECES];
+	public String[][] drawnCards = new String[GAME_PIECES][2];
+	public int gameWinner = -1;
+	public boolean validMousePress = false;
+	public List<String> cards;
+	public CandyLandLoad LoadSaveManager = new CandyLandLoad();
+	
+	// necessary for white-box testing to remove GUI/LibGDX calls
+	public boolean includesScreenLogic = true;
+	public boolean enableLicoriceForTest = false;
 
 	public GameScreen(final CandyLandMain game)
 	{
-		GameScreen.game = game;
-
-		// create instance of CandyLandGame.java
-		new CandyLandGame(GameScreen.game);
-
-		if (CandyLandGame.includesScreenLogic)
+		this.game = game;
+	}
+	
+	public void initializeGame()
+	{
+		// load preferences set by settings screen
+		Preferences preferences = Gdx.app.getPreferences("candyland-prefs");
+		boolean playMusicDuringGame = preferences.getBoolean("music");
+		if (!playMusicDuringGame)
 		{
-			// load preferences set by settings screen
-			Preferences preferences = Gdx.app.getPreferences("candyland-prefs");
-			boolean playMusicDuringGame = preferences.getBoolean("music");
-			if (!playMusicDuringGame)
-			{
-				MainMenuScreen.mainMenuMusic.stop();
-			}
-			createButtons();
-			createBoardSpaces();
-			handleInputs();
-			createSprites();
-			
-			if (!CandyLandGame.loadedGame)
-			{
-				// game not loaded, place sprites at the default position
-				setDefaultPiecePositions();
-			}
-			else
-			{
-				// game loaded, place sprites at their saved position
-				for (int i = 0; i < CandyLandGame.GAME_PIECES; i++)
-				{
-					setPiecePosition();
-					CandyLandGame.incrementIndex();
-				}
-				// disable save button after loading a game as there is nothing to save
-				userSaved = true;
-			}
+			MainMenuScreen.mainMenuMusic.stop();
+		}
+		createButtons();
+		createBoardSpaces();
+		handleInputs();
+		createSprites();
+
+		if (!loadedGame)
+		{
+			// game not loaded, place sprites at the default position
+			setDefaultPiecePositions();
 		}
 		else
 		{
-			createBoardSpaces();
-			playerTokens[0] = PieceSelectionScreen.pieceSelection;
+			// game loaded, place sprites at their saved position
+			for (int i = 0; i < GAME_PIECES; i++)
+			{
+				setPiecePosition();
+				incrementIndex();
+			}
+			// disable save button after loading a game as there is nothing to save
+			userSaved = true;
 		}
+		
+		// Initialize cards if game was not loaded
+		// Otherwise, these arrays are filled by the load method
+		if (!loadedGame)
+		{
+			initializeCards();
+			shuffleCards();
+		}
+
+		initializeLicorice();
+		resetShortcutTaken();
+
+		if (CandyLandMain.DEBUG)
+		{
+			System.out.println("Welcome to Candy Land!\n");
+			System.out.println("Your goal is to reach the end before the other players do!\n");
+			System.out.println("Press RIGHT ARROW KEY to draw a card!\n");
+		}
+
+		// Ensure user can interact with the GameScreen upon creation
+		playerIndex = 0;
+		validPress = true;
+		drawCardPressed = false;
 	}
 
 	/**
@@ -176,12 +225,12 @@ public class GameScreen implements Screen
 				float touchX = screenX * camera.viewportWidth / Gdx.graphics.getWidth();
 				float touchY = (Gdx.graphics.getHeight() - screenY) * camera.viewportHeight / Gdx.graphics.getHeight();
 
-				if (drawButton.contains(touchX, touchY) && CandyLandGame.validPress && !pausedState)
+				if (drawButton.contains(touchX, touchY) && validPress && !pausedState)
 				{
 					// user clicked draw card
 					// user has not saved and this is a valid press
 					userSaved = false;
-					CandyLandGame.validMousePress = true;
+					validMousePress = true;
 					return true;
 				}
 				if (exitButton.contains(touchX, touchY) && pausedState)
@@ -190,14 +239,14 @@ public class GameScreen implements Screen
 					// return to main menu
 					pausedState = false;
 					dispose();
-					CandyLandGame.resetValues();
+					resetValues();
 					game.setScreen(new MainMenuScreen(game));
 					return true;
 				}
 				if (saveButton.contains(touchX, touchY) && pausedState && !userSaved)
 				{
 					// user saved the game on pause screen
-					CandyLandGame.LoadSaveManager.write(1, getPlayerTokens(), CandyLandGame.playerPositions, CandyLandGame.cards, CandyLandGame.skipNextTurn);
+					LoadSaveManager.write(1, getPlayerTokens(), playerPositions, cards, skipNextTurn);
 					userSaved = true;
 					return true;
 				}
@@ -242,7 +291,7 @@ public class GameScreen implements Screen
 	 */
 	private void createSprites()
 	{
-		for (int i = 0; i < CandyLandGame.GAME_PIECES; i++)
+		for (int i = 0; i < GAME_PIECES; i++)
 		{
 			createSprites(i);
 		}
@@ -305,10 +354,10 @@ public class GameScreen implements Screen
 	 */
 	private void setDefaultPiecePositions()
 	{
-		for (int i = 0; i < CandyLandGame.GAME_PIECES; i++)
+		for (int i = 0; i < GAME_PIECES; i++)
 		{
 			Sprite playerPiece = getPlayerSprite(i);
-			int currentPosition = CandyLandGame.getCurrentPositionIndex(i);
+			int currentPosition = getCurrentPositionIndex(i);
 
 			float floatX = gamePositions[currentPosition].returnX() + (SQUARE_SIZE / 2) - (playerPiece.getWidth());
 			float floatY = gamePositions[currentPosition].returnY() + (SQUARE_SIZE / 2) - (playerPiece.getHeight());
@@ -338,8 +387,8 @@ public class GameScreen implements Screen
 		camera.update();
 		renderer.render();
 
-		// Accept right arrow key input method from CandyLandGame
-		CandyLandGame.handleInput();
+		// Accept right arrow key input method from candyLandGame
+		handleInput();
 
 		game.batch.begin();
 		game.batch.draw(peppermintTexture, 1012, 52);
@@ -358,12 +407,12 @@ public class GameScreen implements Screen
 			// game is paused, display the pause screen
 			game.batch.draw(pausedLogo, Gdx.graphics.getWidth() / 2 - 200, Gdx.graphics.getHeight() / 2 + 100);
 			game.batch.draw(exitTexture, exitButton.x, exitButton.y);
-			if (!userSaved && CandyLandGame.validPress && CandyLandGame.activeGame)
+			if (!userSaved && validPress && activeGame)
 			{
 				// player has not saved this round
 				game.batch.draw(saveTexture, saveButton.x, saveButton.y);
 			}
-			else if (CandyLandGame.validPress)
+			else if (validPress)
 			{
 				// player has already saved this round
 				game.batch.draw(savedTexture, saveButton.x, saveButton.y);
@@ -379,7 +428,7 @@ public class GameScreen implements Screen
 			// game is not paused, display the normal board
 			game.batch.draw(pauseTexture, pauseButton.x, pauseButton.y);
 
-			if (CandyLandGame.firstPress)
+			if (firstPress)
 			{
 				// Display text instructions on how to play the game
 				// only if a user has not drawn a card
@@ -402,13 +451,13 @@ public class GameScreen implements Screen
 			* (Requirement 2.1.2)
 	 		*/
 			game.batch.draw(drawCard, drawButton.x, drawButton.y);
-			for (int i = 0; i < CandyLandGame.GAME_PIECES; i++)
+			for (int i = 0; i < GAME_PIECES; i++)
 			{
 				// display each player's game piece
 				Sprite playerSprite = playerSprites[i];
 				playerSprite.draw(game.batch);
 
-				if (!CandyLandGame.firstPress)
+				if (!firstPress)
 				{
 					// display player's game pieces and their names in
 					// top left corner
@@ -429,10 +478,10 @@ public class GameScreen implements Screen
 					game.font.draw(game.batch, youText, youTextX, youTextY);
 				}
 
-				if (CandyLandGame.drawnCards[i][0] != null)
+				if (drawnCards[i][0] != null)
 				{
 					// display drawn card if it has been drawn this round
-					String[] drawnCard = CandyLandGame.drawnCards[i][0].split(" ");
+					String[] drawnCard = drawnCards[i][0].split(" ");
 					float cardX = i == 0 ? 50 : i * 152;
 					float cardY = 825;
 					// format card text to wrap a line below for cards with spaces
@@ -445,11 +494,11 @@ public class GameScreen implements Screen
 					}
 				}
 
-				if (CandyLandGame.drawnCards[i][1] != null)
+				if (drawnCards[i][1] != null)
 				{
 					// display second card if it has been drawn this round
 					// only applicable on Extreme difficulty
-					String[] drawnSecondCard = CandyLandGame.drawnCards[i][1].split(" ");
+					String[] drawnSecondCard = drawnCards[i][1].split(" ");
 					float secondCardX = i == 0 ? 50 : i * 152;
 					float secondCardY = 775;
 					// format card text to wrap a line below for cards with spaces
@@ -461,17 +510,17 @@ public class GameScreen implements Screen
 						secondCardY -= secondCardText.height * 2;
 					}
 				}
-				else if (CandyLandGame.shortcutTaken[i])
+				else if (shortcutTaken[i])
 				{
 					// display shortcut taken through visual text below card drawn
 					float shortcutTextX = i == 0 ? 50 : i * 146;
 					float shortcutTextY = 775;
-					String shortcutDestination = CandyLandGame.getCurrentColor(CandyLandGame.playerPositions[i]);
+					String shortcutDestination = getCurrentColor(playerPositions[i]);
 					determineCardColor(i);
 					shortcutDestination = "-> " + shortcutDestination;
 					game.font.draw(game.batch, shortcutDestination, shortcutTextX, shortcutTextY);
 				}
-				else if (CandyLandGame.skipCurrentTurn[i] || CandyLandGame.skipNextTurn[i])
+				else if (skipCurrentTurn[i] || skipNextTurn[i])
 				{
 					// display licorice text if player's turn will be skipped next round
 					// needs current or next boolean to correctly display when intended
@@ -481,7 +530,7 @@ public class GameScreen implements Screen
 					game.font.draw(game.batch, "X Licorice X", licoriceTextX, licoriceTextY);
 				}
 			}
-			if (CandyLandGame.firstPress)
+			if (firstPress)
 			{
 				// display instructions in bottom left corner
 				// when card hasn't been drawn
@@ -489,7 +538,7 @@ public class GameScreen implements Screen
 				GlyphLayout instructionsText = new GlyphLayout(game.font, "Press Right Arrow Key or Click the Draw Button to Begin!");
 				game.font.draw(game.batch, instructionsText, 10, 85);
 			}
-			else if (CandyLandGame.validPress)
+			else if (validPress)
 			{
 				// indicate it is the user's turn
 				game.font.setColor(Color.PINK);
@@ -498,7 +547,7 @@ public class GameScreen implements Screen
 			}
 			
 			// show licorice spaces at the specified game board positions
-			// these numbers line up with CandyLandGame.handleLicorice()
+			// these numbers line up with handleLicorice()
 			drawLicorice(12);
 			drawLicorice(44);
 			drawLicorice(82);
@@ -532,7 +581,7 @@ public class GameScreen implements Screen
 	{
 		// obtain color at current player's positions
 		// this gives color to location cards like 
-		String color = CandyLandGame.getCurrentColor(CandyLandGame.playerPositions[index]);
+		String color = getCurrentColor(playerPositions[index]);
 		Color textColor;
 
 		// default should never be called as all positions have a valid color
@@ -573,11 +622,11 @@ public class GameScreen implements Screen
 	 * Position stored in positions[][].
 	 * (Requirement 4.0.0)
 	 */
-	public static void movePosition()
+	public void movePosition()
 	{
 		// obtain current player's position and player piece
-		int playerType = CandyLandGame.getCurrentPlayerType();
-		int currentPosition = CandyLandGame.getCurrentPositionIndex(playerType);
+		int playerType = getCurrentPlayerType();
+		int currentPosition = getCurrentPositionIndex(playerType);
 
 		int tempPosition = 0;
 		int numberOfPieces = 1;
@@ -597,9 +646,9 @@ public class GameScreen implements Screen
 		 * 3+ players = set pieces in each corner depending on the player's index
 		 * (Requirement 4.1.0)
 		 */
-		for (int i = 0; i < CandyLandGame.GAME_PIECES; i++)
+		for (int i = 0; i < GAME_PIECES; i++)
 		{
-			tempPosition = CandyLandGame.getCurrentPositionIndex(i);
+			tempPosition = getCurrentPositionIndex(i);
 
 			// determine number of pieces that are overlapping
 			if (i < playerType && tempPosition == currentPosition)
@@ -624,9 +673,9 @@ public class GameScreen implements Screen
 		else if (numberOfPieces > 2)
 		{
 			// more than two pieces are overlapping on the same position
-			for (int i = 0; i < CandyLandGame.GAME_PIECES; i++)
+			for (int i = 0; i < GAME_PIECES; i++)
 			{
-				tempPosition = CandyLandGame.getCurrentPositionIndex(i);
+				tempPosition = getCurrentPositionIndex(i);
 				if (currentPosition == tempPosition)
 				{
 					// set player offset based on their index, like we do
@@ -642,12 +691,12 @@ public class GameScreen implements Screen
 		// end of overlap code
 	}
 	
-	public static void setPiecePosition()
+	public void setPiecePosition()
 	{
 		// obtain current player's position and player piece
-		int playerType = CandyLandGame.getCurrentPlayerType();
+		int playerType = getCurrentPlayerType();
 		Sprite playerPiece = getPlayerSprite(playerType);
-		int currentPosition = CandyLandGame.getCurrentPositionIndex(playerType);
+		int currentPosition = getCurrentPositionIndex(playerType);
 
 		int tempPosition = 0;
 		int numberOfPieces = 1;
@@ -682,9 +731,9 @@ public class GameScreen implements Screen
 		 * 3+ players = set pieces in each corner depending on the player's index
 		 * (Requirement 4.1.0)
 		 */
-		for (int i = 0; i < CandyLandGame.GAME_PIECES; i++)
+		for (int i = 0; i < GAME_PIECES; i++)
 		{
-			tempPosition = CandyLandGame.getCurrentPositionIndex(i);
+			tempPosition = getCurrentPositionIndex(i);
 
 			// determine number of pieces that are overlapping
 			if (i < playerType && tempPosition == currentPosition)
@@ -709,9 +758,9 @@ public class GameScreen implements Screen
 		else if (numberOfPieces > 2)
 		{
 			// more than two pieces are overlapping on the same position
-			for (int i = 0; i < CandyLandGame.GAME_PIECES; i++)
+			for (int i = 0; i < GAME_PIECES; i++)
 			{
-				tempPosition = CandyLandGame.getCurrentPositionIndex(i);
+				tempPosition = getCurrentPositionIndex(i);
 				if (currentPosition == tempPosition)
 				{
 					// set player offset based on their index, like we do
@@ -726,13 +775,13 @@ public class GameScreen implements Screen
 		}
 		// end of overlap code
 
-		for (int i = 0; i < CandyLandGame.GAME_PIECES; i++)
+		for (int i = 0; i < GAME_PIECES; i++)
 		{
 			// adjust game piece to:
 			// correct position if their turn was skipped
 			// account for new overlap
 			// when game is loaded from save state
-			if (CandyLandGame.skipCurrentTurn[i] || numberOfPieces > 1 || CandyLandGame.loadedGame)
+			if (skipCurrentTurn[i] || numberOfPieces > 1 || loadedGame)
 			{
 				final int playerIndex = i;
 				final Sprite piece = getPlayerSprite(i);
@@ -744,11 +793,11 @@ public class GameScreen implements Screen
 						piece.setPosition(positions[playerIndex][0], positions[playerIndex][1]);
 					}
 					// determine animation time based on if game was loaded or not
-				}, CandyLandGame.loadedGame ? 0.0f : 0.5f);
+				}, loadedGame ? 0.0f : 0.5f);
 			}
 		}
 
-		if (playerType == CandyLandGame.GAME_PIECES - 1 && CandyLandGame.activeGame && !CandyLandGame.skipNextTurn[0])
+		if (playerType == GAME_PIECES - 1 && activeGame && !skipNextTurn[0])
 		{
 			// indicate it is the user's turn, which occurs at .6 seconds
 			// where this is after final computer has their animation finished.
@@ -758,14 +807,14 @@ public class GameScreen implements Screen
 				public void run()
 				{
 					userSaved = false;
-					CandyLandGame.validPress = true;
+					validPress = true;
 					if (CandyLandMain.DEBUG)
 					{
 						System.out.println("|---------------------------------|\n");
 						System.out.println("It is your turn! Press RIGHT ARROW KEY to draw a card!\n");
 					}
 				}
-			}, CandyLandGame.loadedGame ? 0.0f : 0.6f);
+			}, loadedGame ? 0.0f : 0.6f);
 		}
 
 		/**
@@ -773,7 +822,7 @@ public class GameScreen implements Screen
 		 * reaching target destination
 		 * (Requirement 4.2.0)
 		 */
-		if (!CandyLandGame.skipCurrentTurn[playerType] && !CandyLandGame.loadedGame)
+		if (!skipCurrentTurn[playerType] && !loadedGame)
 		{
 			// handle normal game piece animations if player is not on licorice
 			// and game was not loaded
@@ -806,7 +855,7 @@ public class GameScreen implements Screen
 			// current turn is over, set skip current turn to false
 			// this only triggers if this was true and it is a normal round
 			// that was not just loaded
-			CandyLandGame.skipCurrentTurn[playerType] = false;
+			skipCurrentTurn[playerType] = false;
 		}
 	}
 
@@ -816,9 +865,9 @@ public class GameScreen implements Screen
 	 * @param p - index of player that won the game, used to indicate
 	 * which winner screen is displayed
 	 */
-	public static void switchToWinnerScreen(int p)
+	public void switchToWinnerScreen(int p)
 	{
-		CandyLandGame.resetValues();
+		resetValues();
 		pausedState = false;
 		game.setScreen(new WinnerScreen(game, p));
 		return;
@@ -830,7 +879,7 @@ public class GameScreen implements Screen
 	 * @param index - index of a player
 	 * @return playerSprites array element at the given index
 	 */
-	private static Sprite getPlayerSprite(int index)
+	private Sprite getPlayerSprite(int index)
 	{
 		return playerSprites[index];
 	}
@@ -841,7 +890,7 @@ public class GameScreen implements Screen
 	 * 
 	 * @param index - player index
 	 */
-	private static void createSprites(int index)
+	private void createSprites(int index)
 	{
 		// determine which texture to use for game piece
 		if (index == 0)
@@ -894,7 +943,7 @@ public class GameScreen implements Screen
 	 * @param index - game piece index
 	 * @return string of player piece texture, associated to a file within the assets
 	 */
-	public static String setTextureString(int index)
+	public String setTextureString(int index)
 	{
 		switch (index)
 		{
@@ -910,6 +959,818 @@ public class GameScreen implements Screen
 				return "cookiePiece.png";
 		}
 	}
+	
+	/**
+	 * Reset all CandyLandGame public variables to their initial state.
+	 * Calling a new GameScreen will otherwise persist these values.
+	 */
+	public void resetValues()
+	{
+		loadedGame = false;
+		skipNextTurn = new boolean[GAME_PIECES];
+		playerPositions = new int[GAME_PIECES];
+		skipCurrentTurn = new boolean[GAME_PIECES];
+		validPress = false;
+		activeGame = false;
+		firstPress = true;
+		shortcutTaken = new boolean[GAME_PIECES];
+		drawnCards = new String[GAME_PIECES][2];
+		gameWinner = -1;
+		validMousePress = false;
+		drawCardPressed = false;
+		playerIndex = 0;
+		cards = new ArrayList<>();
+	}
+
+	/**
+	 * Handle input of user drawing a card during an active game
+	 */
+	public void handleInput()
+	{
+		// Checks if actively viewing a valid game and it is user's turn
+		if (playerIndex == 0 && validPress && gameWinner == -1 && !getPausedState())
+		{
+			// Accepts draw card input through RIGHT ARROW key and mouse click on the draw card button
+			if (Gdx.input.isKeyJustPressed(Keys.RIGHT) || validMousePress)
+			{
+				// Ensures players cannot draw multiple times by rapidly drawing
+				if (!drawCardPressed)
+				{
+					drawCardPressed = true;
+					validPress = false;
+					validMousePress = false;
+					activeGame = true;
+					firstPress = false;
+					resetDrawnCards();
+					resetShortcutTaken();
+					drawCard();
+				}
+			}
+			else
+			{
+				drawCardPressed = false;
+			}
+		}
+	}
+
+	/**
+	 * Reset the current rounds' drawn cards.
+	 * Array is used to display card text visually on 
+	 */
+	public void resetDrawnCards()
+	{
+		for (int i = 0; i < GAME_PIECES; i++)
+		{
+			drawnCards[i][0] = null;
+		}
+	}
+
+	/**
+	 * Create the 64 card deck
+	 * (Requirement 1.0.0)
+	 */
+	private void initializeCards()
+	{
+		cards = new ArrayList<>();
+
+		/**
+		* Create 48 single color cards, 8 of each color
+		* (Requirement 1.0.1)
+		*/
+		for (String color : COLORS)
+		{
+			for (int i = 0; i < SINGLE_CARDS; i++)
+			{
+				cards.add(color);
+			}
+		}
+
+		/**
+		* Create 12 double color cards, 2 of each color
+		* (Requirement 1.0.2)
+		*/
+		for (int i = 0; i < DOUBLE_CARDS; i++)
+		{
+			for (String color : COLORS)
+			{
+				cards.add("Double " + color);
+			}
+		}
+
+		/**
+		* Create 4 special character cards
+		* (Requirement 1.0.3)
+		*/
+		cards.add("Peppermint Forest");
+		cards.add("Gumdrop Mountains");
+		cards.add("Peanut Acres");
+		cards.add("Lollipop Woods");
+	}
+
+	/**
+	 * Initialize licorice logic.
+	 * skipCurrentTurn indicates licorice text on screen for 
+	 * skipNextTurn determines skipping turns.
+	 * Called only on initilization.
+	 */
+	private void initializeLicorice()
+	{
+		for (int i = 0; i < GAME_PIECES; i++)
+		{
+			skipCurrentTurn[i] = false;
+			if (!loadedGame)
+			{
+				skipNextTurn[i] = false;
+			}
+		}
+	}
+
+	/**
+	 * Reset shortcuts taken boolean.
+	 * Called after user input of drawing card but before card is drawn
+	 */
+	public void resetShortcutTaken()
+	{
+		for (int i = 0; i < GAME_PIECES; i++)
+		{
+			shortcutTaken[i] = false;
+		}
+	}
+
+	/**
+	 * Shuffle card deck.
+	 * Called when checkEmptyDeck() returns true
+	 */
+	private void shuffleCards()
+	{
+		if (!cards.isEmpty())
+		{
+			Collections.shuffle(cards);
+		}
+	}
+
+	/**
+	 * User draws card from deck.
+	 * (Requirement 1.1.0)
+	 */
+	public void drawCard()
+	{
+		if (includesScreenLogic)
+		{
+			// Check valid card in deck and draw next card
+			checkEmptyDeck();
+			String card = nextCard();
+
+			if (CandyLandMain.DEBUG)
+			{
+				System.out.println("You (" + getPiece(playerIndex) + ") drew: " + card);
+			}
+			drawnCards[playerIndex][0] = card;
+
+			// Move player based on number of steps determined from calculateSteps()
+			movePlayer(card, calculateSteps(card));
+
+			removeCard();
+			checkWinner();
+			incrementIndex();
+		}
+		else
+		{
+			if (!enableLicoriceForTest || (!skipNextTurn[playerIndex] && enableLicoriceForTest))
+			{
+				checkEmptyDeck();
+				String card = nextCard();
+
+				if (CandyLandMain.DEBUG)
+				{
+					System.out.println("You (" + getPiece(playerIndex) + ") drew: " + card);
+				}
+				drawnCards[playerIndex][0] = card;
+
+				// Move player based on number of steps determined from calculateSteps()
+				movePlayer(card, calculateSteps(card));
+
+				removeCard();
+				checkWinner();
+				incrementIndex();
+			}
+			else
+			{
+				skipCurrentTurn[playerIndex] = true;
+				skipNextTurn[playerIndex] = false;
+				incrementIndex();
+			}
+		}
+
+		if (includesScreenLogic)
+		{
+			// 0.4 second timer to allow for space between user's draw and computers drawing cards
+			Timer.schedule(new Timer.Task()
+			{
+				@Override
+				public void run()
+				{
+					handleComputerTurn();
+				}
+			}, 0.4f);
+		}
+		else
+		{
+			handleComputerTurn();
+		}
+	}
+
+	/**
+	 * Computer draws card from deck
+	 * (Requirement 1.1.1)
+	 */
+	private void handleComputerTurn()
+	{
+		if (includesScreenLogic)
+		{
+			// 0.4 second timer to allow for space between computer turns
+			Timer.schedule(new Timer.Task()
+			{
+				@Override
+				public void run()
+				{
+					if (playerIndex != 0 && activeGame)
+					{
+						// Computer not on Licorice location
+						if (!skipNextTurn[playerIndex])
+						{
+							checkEmptyDeck();
+							String card1 = nextCard();
+							drawnCards[playerIndex][0] = card1;
+							int steps1 = calculateSteps(card1);
+							removeCard();
+							String finalCard = card1;
+							int finalSteps = steps1;
+
+							// Load difficulty preference
+							Preferences preferences = Gdx.app.getPreferences("candyland-prefs");
+							boolean extremeDifficulty = preferences.getBoolean("difficulty");
+							if (extremeDifficulty)
+							{
+								// Computer draws second card if Extreme difficulty selected
+								checkEmptyDeck();
+								final String card2 = nextCard();
+								drawnCards[playerIndex][1] = card2;
+								int steps2 = calculateSteps(card2);
+								removeCard();
+
+								// Determines which card drawn will progress the player further
+								if (steps1 <= steps2)
+								{
+									finalCard = card2;
+									finalSteps = steps2;
+								}
+								final String chosenCard = finalCard;
+								final int index = playerIndex;
+
+								// 1 second timer to visually remove the second drawn card text on GameScreen
+								Timer.schedule(new Timer.Task()
+								{
+									@Override
+									public void run()
+									{
+										drawnCards[index][0] = chosenCard;
+										drawnCards[index][1] = null;
+									}
+								}, 1.0f);
+								if (CandyLandMain.DEBUG)
+								{
+									System.out.println("Computer " + index + " (" + getPiece(index) + ") drew: " + card1 + " and " + card2);
+								}
+							}
+							if (CandyLandMain.DEBUG)
+							{
+								String phrasing = extremeDifficulty ? "chose" : "drew";
+								System.out.println("Computer " + playerIndex + " (" + getPiece(playerIndex) + ") " + phrasing + ": " + finalCard);
+							}
+							movePlayer(finalCard, finalSteps);
+							checkWinner();
+							incrementIndex();
+							validPress = false;
+						}
+						else
+						{
+							// Computer was on Licorice location
+							if (CandyLandMain.DEBUG)
+							{
+								System.out.println("Computer " + playerIndex + " (" + getPiece(playerIndex) + ") is on a Licorice space and had their turn skipped!");
+								System.out.println("Stayed at position " + getBoardPosition(playerPositions[playerIndex]) + "/" + MAX_POSITIONS + ": " + getCurrentColor(playerPositions[playerIndex]) + "\n");
+							}
+							skipCurrentTurn[playerIndex] = true;
+							if (includesScreenLogic)
+							{
+								setPiecePosition();
+							}
+							skipNextTurn[playerIndex] = false;
+							incrementIndex();
+						}
+
+					}
+
+					// Handle next computer's turn
+					if (playerIndex != 0)
+					{
+						handleComputerTurn();
+					}
+					// Player landed on licorice space
+					// Skip their turn and draw the next round of computer cards
+					else if (playerIndex == 0 && skipNextTurn[playerIndex])
+					{
+						// 1.1 second timer to add space between rounds
+						// .1 seconds longer than the visually remove second drawn card text
+						// from GameScreen timer, to prevent cards being incorrectly removed from GameScreen
+						Timer.schedule(new Timer.Task()
+						{
+							@Override
+							public void run()
+							{
+								if (CandyLandMain.DEBUG)
+								{
+									System.out.println("You are on a Licorice space so your turn was skipped!");
+									System.out.println("Stayed at position " + getBoardPosition(playerPositions[playerIndex]) + "/" + MAX_POSITIONS + ": " + getCurrentColor(playerPositions[playerIndex]) + "\n");
+								}
+								skipCurrentTurn[playerIndex] = true;
+								if (includesScreenLogic)
+								{
+									setPiecePosition();
+								}
+								skipNextTurn[playerIndex] = false;
+								resetDrawnCards();
+								resetShortcutTaken();
+								incrementIndex();
+								handleComputerTurn();
+							}
+						}, 1.1f);
+					}
+				}
+			}, 0.4f);
+		}
+		else
+		{
+			while (playerIndex != 0 && activeGame)
+			{
+				checkEmptyDeck();
+				String card = nextCard();
+
+				// Move player based on number of steps determined from calculateSteps()
+				movePlayer(card, calculateSteps(card));
+
+				removeCard();
+				checkWinner();
+				incrementIndex();
+			}
+		}
+	}
+
+	/**
+	 * Returns an integer representing the location of the specified player's index
+	 * 
+	 * @param	index - the index of a player within playerIndex
+	 * @return	integer of the specified player's position on the game board
+	 */
+	public int getCurrentPositionIndex(int index)
+	{
+		return playerPositions[index];
+	}
+
+	/**
+	 * Determine if a player has won the game
+	 * (Requirement 1.3.0)
+	 */
+	public void checkWinner()
+	{
+		// Prevent multiple players from winning in the same round
+		if (gameWinner == -1)
+		{
+			for (int i = 0; i < GAME_PIECES; i++)
+			{
+				if (playerPositions[i] >= MAX_POSITIONS)
+				{
+					activeGame = false;
+					validPress = false;
+					if (CandyLandMain.DEBUG)
+					{
+						if (i != 0)
+						{
+							System.out.println("Computer " + i + " has won the game!");
+						}
+						else
+						{
+							System.out.println("Congratulations! You have won the game!");
+						}
+					}
+					gameWinner = i;
+					int winnerIndex = gameWinner;
+
+					if (includesScreenLogic)
+					{
+						// 1.2 second timer to allow for user to see a piece has moved
+						// into the FINISH location on GameScreen
+						Timer.schedule(new Timer.Task()
+						{
+							@Override
+							public void run()
+							{
+								switchToWinnerScreen(winnerIndex);
+							}
+						}, 1.2f);
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * Create a new deck of cards and shuffle if the deck is empty
+	 * (Requirement 1.1.2)
+	 */
+	public void checkEmptyDeck()
+	{
+		if (cards.isEmpty())
+		{
+			initializeCards();
+			shuffleCards();
+		}
+	}
+
+	/**
+	 * Obtain the game piece for a specified player index.
+	 * Only used to print in console
+	 * 
+	 * @param index - player index
+	 * @return string of player's game piece, with the file type removed
+	 */
+	private String getPiece(int index)
+	{
+		String texture = getTextureString(index);
+		return texture.substring(0, texture.lastIndexOf('.'));
+	}
+	
+	/**
+	 * Returns an integer representing the number of steps required
+	 * to reach the drawn card from the current position
+	 * (Requirement 1.2.0)
+	 * 
+	 * @param	nextCard - the string of the card drawn
+	 * @return	the steps needed to reach the position from the drawn card
+	 */
+	public int calculateSteps(String nextCard)
+	{
+		int steps = 0;
+		/**
+		 * Double color cards move to second nearest color position
+		 * (Requirement 1.2.2)
+		 */
+		if (nextCard.contains("Double"))
+		{
+			String drawnColor = nextCard.substring("Double ".length());
+			steps = getStepsFromColor(drawnColor);
+			// Add 6 to steps needed as there are 6 colors,
+			// which handles the double color draws
+			steps += 6;
+		}
+
+		/**
+		 * Special cards cards move to pre-determined board position
+		 * (Requirement 1.2.3)
+		 */
+		else if (nextCard.contains("Peppermint Forest"))
+		{
+			steps = 20;
+		}
+		else if (nextCard.contains("Gumdrop Mountains"))
+		{
+			steps = 36;
+		}
+		else if (nextCard.contains("Peanut Acres"))
+		{
+			steps = 72;
+		}
+		else if (nextCard.contains("Lollipop Woods"))
+		{
+			steps = 99;
+		}
+		else
+		{
+			/**
+			 * Single color cards move to nearest color position
+			 * (Requirement 1.2.1)
+			 */
+			steps = getStepsFromColor(nextCard);
+		}
+		return steps;
+	}
+
+	/**
+	 * Move the player index and piece position based on card drawn
+	 * 
+	 * @param	nextCard - the string of the card drawn
+	 * @param 	steps - number of steps the player piece will move
+	 */
+	public void movePlayer(String nextCard, int steps)
+	{
+		// Check for 4 special cards
+		if (nextCard.contains("Peppermint Forest") || nextCard.contains("Gumdrop Mountains") || nextCard.contains("Peanut Acres") || nextCard.contains("Lollipop Woods"))
+		{
+			//Special card drawn so set player position to value of special card
+			playerPositions[playerIndex] = steps;
+		}
+		else
+		{
+			//Normal movement card so add steps to current player position
+			int newPosition = playerPositions[playerIndex] + steps;
+			playerPositions[playerIndex] = newPosition;
+		}
+
+		if (CandyLandMain.DEBUG)
+		{
+			System.out.println("Moved to position " + getBoardPosition(playerPositions[playerIndex]) + "/" + MAX_POSITIONS + ": " + getCurrentColor(playerPositions[playerIndex]));
+		}
+
+		// Handle logic of shortcuts and licorice before setting piece position
+		// Ideally we should handle shortcuts differently with a timer after
+		// person reaches their drawn card, to then display the shortcut movement
+		handleShortcuts();
+		handleLicorice();
+
+		if (CandyLandMain.DEBUG)
+		{
+			System.out.println("");
+		}
+
+		// Prevent player position array from overflowing if there is a winner
+		if (playerPositions[playerIndex] >= MAX_POSITIONS)
+		{
+			playerPositions[playerIndex] = MAX_POSITIONS;
+		}
+		// Move game piece on GameScreen to new position
+		if (includesScreenLogic)
+		{
+			setPiecePosition();
+		}
+	}
+
+	/**
+	 * Determine if player landed on a shortcut location
+	 * (Requirement 4.0.1)
+	 */
+	private void handleShortcuts()
+	{
+		if (playerPositions[playerIndex] == 27)
+		{
+			// Set player position to shortcut destination
+			playerPositions[playerIndex] = 56;
+			if (CandyLandMain.DEBUG)
+			{
+				System.out.println("Landed on the Rainbow Trail shortcut!");
+				System.out.println("New position is " + getBoardPosition(playerPositions[playerIndex]) + "/" + MAX_POSITIONS + ": "  + getCurrentColor(playerPositions[playerIndex]));
+			}
+			shortcutTaken[playerIndex] = true;
+		}
+		else if (playerPositions[playerIndex] == 49)
+		{
+			// Set player position to shortcut destination
+			playerPositions[playerIndex] = 74;
+			if (CandyLandMain.DEBUG)
+			{
+				System.out.println("Landed on the Gumdrop Pass shortcut!");
+				System.out.println("New position is " + getBoardPosition(playerPositions[playerIndex]) + "/" + MAX_POSITIONS + ": "  + getCurrentColor(playerPositions[playerIndex]));
+			}
+			shortcutTaken[playerIndex] = true;
+		}
+	}
+
+	/**
+	 * Determine if player landed on a licorice location
+	 * (Requirement 4.0.2)
+	 */
+	private void handleLicorice()
+	{
+		if (playerPositions[playerIndex] == 12 || playerPositions[playerIndex] == 44 || playerPositions[playerIndex] == 82)
+		{
+			if (CandyLandMain.DEBUG)
+			{
+				System.out.println("Landed on Licorice so the next turn will be skipped!");
+			}
+			skipNextTurn[playerIndex] = true;
+		}
+	}
+
+	/**
+	 * Return integer of the visual location of a player piece on game board
+	 * 
+	 * @param	currentPlayerPosition - the location of a player position
+	 * @return	the location of the input + 1
+	 */
+	private int getBoardPosition(int currentPlayerPosition)
+	{
+		return currentPlayerPosition + 1;
+	}
+
+	/**
+	 * Determine the number of steps a given color card will move a player
+	 * 
+	 * @param	color - a card color
+	 * @return	the number of steps the current player will be moved
+	 */
+	public int getStepsFromColor(String color)
+	{
+		// Obtain index of input color within COLORS array
+		// We add 1 because we want to know the card number (1 : 6)
+		int drawnCardValue = Arrays.asList(COLORS).indexOf(color) + 1;
+		int steps = 0;
+		
+		// Obtain card value of current player's position
+		int currentCardValue = getCardValue(playerPositions[playerIndex]);
+
+		if (currentCardValue < 0)
+		{
+			currentCardValue = 0;
+		}
+
+		// Current position color's value is greater than drawn card's value
+		if (currentCardValue > drawnCardValue)
+		{
+			// Subtract current card's value from color array length
+			// and add the drawn card's value to this number to obtain steps
+			int temp = COLORS.length - currentCardValue;
+			temp += drawnCardValue;
+			steps = temp;
+		}
+		// Current position's color is the same as the drawn color
+		else if (currentCardValue == drawnCardValue)
+		{
+			// length of array will move to same color
+			steps = COLORS.length;
+		}
+		// Current position color value is less than drawn card color value
+		else
+		{
+			// Subtract drawn card's value from current position value
+			steps = drawnCardValue - currentCardValue;
+			if (steps < 0)
+			{
+				steps = Math.abs(steps);
+			}
+		}
+		return steps;
+	}
+
+	/**
+	 * Remove card from deck.
+	 * Only called after checkEmptyDeck()
+	 */
+	private void removeCard()
+	{
+		cards.remove(0);
+	}
+
+	/**
+	 * Determine the color of a playerPositions position
+	 * 
+	 * @param	position - a location within the playerPositions array (0 : X)
+	 * @return	the color of the specified position
+	 */
+	public String getCurrentColor(int position)
+	{
+		// Start position
+		if (position == 0)
+		{
+			// Last element in array is first color on the board
+			return COLORS[COLORS.length - 1];
+		}
+		// Not the start position
+		else
+		{
+			// Remainder indicates game board position
+			int color = position % COLORS.length;
+
+			// No remainder, last position in the array, first position on board
+			if (color == 0)
+			{
+				// String of last element in array, first position on board
+				return COLORS[COLORS.length - 1];
+			}
+			// Not the last position in the array
+			else
+			{
+				// Subtract one to obtain COLORS array position
+				// color indicates game board position (COLORS + 1)
+				// 0 : 4
+				return COLORS[color - 1];
+			}
+		}
+	}
+
+	/**
+	 * Determine the value of a card
+	 * 
+	 * @param	position - a location within the playerPositions array (0 : X)
+	 * @return	the game board value of the specified position
+	 */
+	public int getCardValue(int position)
+	{
+		// Start position
+		if (position == 0)
+		{
+			// value of starting location
+			return 0;
+		}
+		else
+		{
+			// Remainder indicates game board position
+			int color = position % COLORS.length;
+
+			// No remainder, last position in the array, first position on board (0 : 5)
+			if (color == 0)
+			{
+				return COLORS.length;
+			}
+			else
+			{
+				// game board position
+				// 1 : 5
+				return color;
+			}
+		}
+	}
+
+	/**
+	 * Obtain the next card to be drawn
+	 * 
+	 * @return	the string of the next card in the deck
+	 */
+	private String nextCard()
+	{
+		return cards.get(0);
+	}
+
+	/**
+	 * Increment current player index
+	 * Starts over at 0 once it would reach GAME_PIECES value.
+	 */
+	public void incrementIndex()
+	{
+		playerIndex = (playerIndex + 1) % GAME_PIECES;
+	}
+
+	/**
+	 * Obtain the index of the current player.
+	 * 0 = User.
+	 * 1 : 3 = Computer.
+	 * 
+	 * @return	the index of the current player
+	 */
+	public int getCurrentPlayerType()
+	{
+		return playerIndex;
+	}
+
+	/**
+	 * Check if there is a winner
+	 * 
+	 * @return	integer indicating which player index won the game. Returns -1 if no winner.
+	 */
+	public int getWinner()
+	{
+		return gameWinner;
+	}
+
+	/**
+	 * Load a saved game state through LoadStateManager
+	 * 
+	 * @param	slotNumber - slot of the desired game save
+	 * @return	boolean value indicating if save was loaded
+	 */
+	public boolean load(int slotNumber)
+	{
+		// check if save file exists
+		boolean loadCorrect = LoadSaveManager.read(slotNumber);
+
+		// file exists
+		if (loadCorrect)
+		{
+			// import values from the game save
+			loadedGame = true;
+			cards = LoadSaveManager.getCards();
+			skipNextTurn = LoadSaveManager.getLicoriceStatus();
+			playerPositions = LoadSaveManager.getPlayerPositions();
+			PieceSelectionScreen.pieceSelection = LoadSaveManager.getPlayerTokens()[0];
+
+			// disable save button after loading a game as there is nothing to save
+			userSaved = true;
+			
+			return true;
+		}
+		//file does not exist
+		return false;
+	}
 
 	/**
 	 * Returns integer array indicating the index of each player's game piece.
@@ -917,7 +1778,7 @@ public class GameScreen implements Screen
 	 * 
 	 * @return integer array with index of each player's game piece, attributed to a specific texture in setTextureString()
 	 */
-	public static int[] getPlayerTokens()
+	public int[] getPlayerTokens()
 	{
 		return playerTokens;
 	}
@@ -928,9 +1789,19 @@ public class GameScreen implements Screen
 	 * @param index - player index
 	 * @return - string of game piece texture at a player's index. Displays the full file, including .png
 	 */
-	public static String getTextureString(int index)
+	public String getTextureString(int index)
 	{
 		return playerTextures[index].toString();
+	}
+	
+	public boolean getPausedState()
+	{
+		return pausedState;
+	}
+
+	public void setPausedState(boolean pausedState)
+	{
+		this.pausedState = pausedState;
 	}
 
 	@Override

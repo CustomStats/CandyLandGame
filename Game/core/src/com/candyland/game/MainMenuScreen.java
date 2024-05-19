@@ -9,7 +9,7 @@ package com.candyland.game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.Preferences;
-import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
@@ -18,7 +18,7 @@ import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 
-public class MainMenuScreen implements Screen
+public class MainMenuScreen extends ScreenAdapter
 {
 	// buttons and images
 	private Texture mainMenuBackgroundTexture;
@@ -115,13 +115,15 @@ public class MainMenuScreen implements Screen
 				}
 				if (loadButton.contains(touchX, touchY))
 				{
+					GameScreen gameScreen = new GameScreen(game);
 					// user selected continue game
-					if (CandyLandGame.load(1))
+					if (gameScreen.load(1))
 					{
 						// valid save loaded, switch display to game screen
 						dispose();
-						game.setScreen(new GameScreen(game));
-						CandyLandGame.loadedGame = false;
+						gameScreen.initializeGame();
+						game.setScreen(gameScreen);
+						gameScreen.loadedGame = false;
 					}
 					return true;
 				}
@@ -205,7 +207,6 @@ public class MainMenuScreen implements Screen
 		exitTexture.dispose();
 		settingsTexture.dispose();
 		loadTexture.dispose();
-		Gdx.input.setInputProcessor(null);
 	}
 
 	@Override

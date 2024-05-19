@@ -10,7 +10,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.Preferences;
-import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
@@ -27,7 +27,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 
-public class SettingsScreen implements Screen
+public class SettingsScreen  extends ScreenAdapter
 {
 	// buttons and images
 	private Texture backgroundTexture;
@@ -432,7 +432,6 @@ public class SettingsScreen implements Screen
 		backTexture.dispose();
 		backgroundTexture.dispose();
 		titleCard.dispose();
-		Gdx.input.setInputProcessor(null);
 	}
 
 	@Override

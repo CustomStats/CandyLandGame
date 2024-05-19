@@ -9,7 +9,7 @@ package com.candyland.game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input.Keys;
 import com.badlogic.gdx.InputAdapter;
-import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Pixmap;
@@ -22,7 +22,7 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 
 
-public class PieceSelectionScreen implements Screen
+public class PieceSelectionScreen extends ScreenAdapter
 {
 	// buttons and images
 	private Texture backgroundTexture;
@@ -37,7 +37,7 @@ public class PieceSelectionScreen implements Screen
 	private Rectangle backButton;
 
 	// visual rectangle around selected game piece
-	private Rectangle[] pieceRectangles = new Rectangle[CandyLandGame.GAME_PIECES];
+	private Rectangle[] pieceRectangles = new Rectangle[GameScreen.GAME_PIECES];
 	private ShapeRenderer shapeRenderer = new ShapeRenderer();
 
 	private FitViewport viewport;
@@ -80,7 +80,9 @@ public class PieceSelectionScreen implements Screen
 				{
 					// user selected play, start a new game on the board
 					dispose();
-					game.setScreen(new GameScreen(game));
+					GameScreen gameScreen = new GameScreen(game);
+					gameScreen.initializeGame();
+					game.setScreen(gameScreen);
 					return true;
 				}
 				if (backButton.contains(touchX, touchY))
@@ -266,7 +268,6 @@ public class PieceSelectionScreen implements Screen
 		pieceThreeTexture.dispose();
 		pieceFourTexture.dispose();
 		shapeRenderer.dispose();
-		Gdx.input.setInputProcessor(null);
 	}
 
 	@Override

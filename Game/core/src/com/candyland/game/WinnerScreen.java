@@ -8,14 +8,14 @@ package com.candyland.game;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputAdapter;
-import com.badlogic.gdx.Screen;
+import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 
-public class WinnerScreen implements Screen
+public class WinnerScreen  extends ScreenAdapter
 {
 	// buttons and images
 	private Texture winnerTexture;
@@ -117,7 +117,6 @@ public class WinnerScreen implements Screen
 		stage.dispose();
 		winnerTexture.dispose();
 		gameOverBackgroundTexture.dispose();
-		Gdx.input.setInputProcessor(null);
 	}
 
 	@Override
