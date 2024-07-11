@@ -2,7 +2,7 @@ Project initially created/finished for a software engineering course.
 
 All further development continued individually after course had completed.
 
-Commit history before transition to personal github: https://www.dropbox.com/scl/fi/rpxbn4o7egu9ih122p18g/eclipse_TvfexKl4R3.mp4?rlkey=b7fhqz76hc44a9rnoqtw2tf0s&dl=0
+Commit history before transition to personal github available upon request.
 
 Welcome to the Candy Land Game source code!~
 
